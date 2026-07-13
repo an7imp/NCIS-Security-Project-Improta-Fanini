@@ -49,7 +49,7 @@ class PolicyModule:
         self.recently_blocked_lock = threading.Lock()
 
         # Storico pps per flusso per calcolare soglie dinamiche
-        self.flow_pps_history = defaultdict(lambda: deque(maxlen=self.adaptive_history_size))
+        self.flow_pps_history = defaultdict(lambda: deque(maxlen=self.adaptive_history_size)) #crea un dizionario che mappa flow_key a una deque (coda a lunghezza limitata) che memorizza gli ultimi campioni di pacchetti al secondo (pps) per quel flusso. La lunghezza massima della deque è definita da adaptive_history_size.
         self.flow_pps_history_lock = threading.Lock()
 
         # Thread di elaborazione policy
@@ -64,7 +64,7 @@ class PolicyModule:
             try:
                 # Prendi il prossimo evento dal monitoring
                 try:
-                    flow_event = self.stats_queue.get(timeout=0.5)
+                    flow_event = self.stats_queue.get(timeout=0.5)#timeout vuol dire che se non ci sono eventi nella coda entro 0.5 secondi, solleva un'eccezione Empty. Questo evita che il thread rimanga bloccato indefinitamente se non ci sono nuovi dati da elaborare.
                 except Empty:
                     hub.sleep(0.1)
                     continue
@@ -88,7 +88,7 @@ class PolicyModule:
         )
 
     def is_recently_blocked(self, flow_key, now_ts):
-        #Verifica se il flusso è stato bloccato di recente per evitare regole duplicate
+        #Verifica se il flusso è stato bloccato di recente (entro 1 secondo) per evitare duplicati
         with self.recently_blocked_lock:
             last_blocked_ts = self.recently_blocked.get(flow_key)
             if last_blocked_ts is None:
@@ -106,7 +106,7 @@ class PolicyModule:
 
     def get_adaptive_threshold_pps(self, flow_key, src=None, dst=None):
         #Calcola la threshold dinamica per il flusso usando lo storico recente
-        static_floor_pps = self.flow_pkt_threshold / self.flow_window_sec
+        static_floor_pps = self.flow_pkt_threshold / self.flow_window_sec #static_floor_pps è il numero minimo di pacchetti al secondo (pps) che consideriamo come soglia di base per decidere se un flusso è sospetto. Viene calcolato dividendo il numero di pacchetti soglia (flow_pkt_threshold) per la finestra temporale (flow_window_sec). Ad esempio, se flow_pkt_threshold=100 e flow_window_sec=1.0, allora static_floor_pps=100 pps.
 
         if not self.adaptive_threshold_enabled:
             return static_floor_pps

@@ -37,7 +37,7 @@ class EnforcementModule:
                 try:
                     decision = self.decisions_queue.get(timeout=0.5)
                 except Empty:
-                    hub.sleep(0.1)
+                    hub.sleep(0.1) #timeout e sleep fanno sì che il thread non rimanga bloccato indefinitamente se non ci sono nuove decisioni da elaborare. in particolare, se non ci sono decisioni nella coda entro 0.5 secondi, solleva un'eccezione Empty e il thread dorme per 0.1 secondi prima di riprovare.
                     continue
 
                 # Applica la decisione
@@ -93,8 +93,8 @@ class EnforcementModule:
             )
 
     def install_drop_flow(self, datapath, match, hard_timeout):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
+        
+        parser = datapath.ofproto_parser #parser è un oggetto che fornisce metodi per creare oggetti OpenFlow in modo compatibile con la versione dello switch.
         mod = parser.OFPFlowMod(
             datapath=datapath,
             priority=100,

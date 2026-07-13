@@ -24,7 +24,7 @@ class SimpleSwitch13(app_manager.RyuApp):
     
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
-    FLOW_WINDOW_SEC = 1.0
+    FLOW_WINDOW_SEC = 1.0 # Finestra temporale per il calcolo delle statistiche dei flussi
     FLOW_PKT_THRESHOLD = 350
     FLOW_BLOCK_SECONDS = 15
     STATS_POLL_SEC = 1.0
@@ -32,17 +32,17 @@ class SimpleSwitch13(app_manager.RyuApp):
     ADAPTIVE_HISTORY_SIZE = 12
     ADAPTIVE_MULTIPLIER = 1.7
     ADAPTIVE_MIN_SAMPLES = 3
-    WHITELIST_MACS = set()
-    WHITELIST_ETHERTYPES = {
+    WHITELIST_MACS = set() #
+    WHITELIST_ETHERTYPES = { # Lista di tipi di Ethernet da whiteliste
         ether_types.ETH_TYPE_ARP,
         ether_types.ETH_TYPE_LLDP,
     }
     
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs) #super() chiama il costruttore della classe base RyuApp, inizializzando il framework Ryu e registrando l'applicazione come un'applicazione Ryu.
 
-        # Dizionario: {dpid: {mac: porta}}
-        self.mac_to_port = {}
+        # Dizionario: {dpid: {mac: porta}} dpid è l'identificatore dello switch, mac è l'indirizzo MAC sorgente e porta è la porta dello switch a cui è connesso l'host con quell'indirizzo MAC.
+        self.mac_to_port = {} #questo dizionario viene utilizzato per implementare il comportamento di switching del controller, consentendo di inoltrare i pacchetti verso le porte corrette in base agli indirizzi MAC sorgente e destinazione.
         # Switch connessi per polling statistiche
         self.datapaths = {}
         
@@ -109,8 +109,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                 if not data or 'flow_key' not in data:
                     return jsonify({'error': 'Missing flow_key'}), 400
 
-                flow_key = tuple(data['flow_key'])
-                duration = data.get('duration', SimpleSwitch13.FLOW_BLOCK_SECONDS)
+                flow_key = tuple(data['flow_key']) #qui converte la lista JSON flow_key in una tupla Python, che è il formato utilizzato internamente per rappresentare le chiavi dei flussi. La tupla contiene (dpid, in_port, src_mac, dst_mac, eth_type).
+                duration = data.get('duration', SimpleSwitch13.FLOW_BLOCK_SECONDS) #qui imposta la durata del blocco del flusso. Se il client non specifica una durata, viene utilizzata la durata predefinita definita nella classe SimpleSwitch13 (FLOW_BLOCK_SECONDS).
 
                 if not isinstance(duration, (int, float)) or duration <= 0:
                     return jsonify({'error': 'duration must be positive'}), 400
@@ -132,7 +132,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         def remove_from_blocklist(flow_key):
             #Rimuove uno specifico flow dalla blocklist
             try:
-                flow_key_tuple = literal_eval(flow_key)
+                flow_key_tuple = literal_eval(flow_key) #
                 result = self.enforcement_module.remove_from_blocklist(flow_key_tuple)
                 status_code = 200 if result['status'] == 'removed' else 404
                 return jsonify({
@@ -150,7 +150,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             now = time.time()
 
             expired_count = sum(1 for ts in blocklist.values() if ts <= now)
-            active_count = len(blocklist) - expired_count
+            active_count = len(blocklist) - expired_count #calcola quantità di flussi attivi sottraendo il numero di flussi scaduti dal numero totale di flussi nella blocklist.
             
             return jsonify({
                 'status': 'success',
@@ -169,8 +169,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         #crea una tupla chiave per identificare univocamente un flusso.
         return (dpid, in_port, src, dst, eth_type)
 
-    @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
-    def flow_stats_reply_handler(self, ev):
+    @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER) 
+    def flow_stats_reply_handler(self, ev): #ev è l'evento che contiene le statistiche dei flussi ricevute dallo switch. Questo metodo viene chiamato quando il controller riceve una risposta alle richieste di statistiche dei flussi inviate agli switch.
         
         #Gestisce le risposte OpenFlow FlowStats
         #Delega al MonitoringModule per l'estrazione dei dati statistici
@@ -178,19 +178,19 @@ class SimpleSwitch13(app_manager.RyuApp):
         datapath = msg.datapath
         
         # Il MonitoringModule processa i dati e consegna gli eventi al PolicyModule tramite una coda
-        self.monitoring_module.process_flow_stats_reply(datapath, msg.body)
+        self.monitoring_module.process_flow_stats_reply(datapath, msg.body) #body contiene le statistiche dei flussi ricevute dallo switch. Il MonitoringModule elabora queste statistiche, calcola le metriche necessarie (come il rate di pacchetti) e invia gli eventi al PolicyModule per ulteriori decisioni.
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         
         #Gestisce la registrazione di un nuovo switch e installa la regola table-miss
-        datapath = ev.msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
+        datapath = ev.msg.datapath #datapath rappresenta lo switch che ha inviato l'evento di registrazione. Contiene informazioni sullo switch, come il suo identificatore (dpid) e le capacità supportate.
+        ofproto = datapath.ofproto #ofproto è un riferimento alla libreria di protocolli OpenFlow specifica per la versione 1.3. Contiene costanti e metodi utili per costruire messaggi OpenFlow, come le azioni, i tipi di messaggi e le porte speciali.
+        parser = datapath.ofproto_parser#il parser è un oggetto che fornisce metodi per creare messaggi OpenFlow specifici per la versione 1.3. Viene utilizzato per costruire messaggi come FlowMod, PacketOut e altri, che vengono inviati allo switch per configurare il comportamento della rete.
 
         # Installa la regola di table-miss (priorita' minima)
-        match = parser.OFPMatch()
-        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+        match = parser.OFPMatch() #qui viene creato un oggetto match vuoto, che corrisponde a tutti i pacchetti. In altre parole, questa regola catturerà qualsiasi pacchetto che non corrisponde a nessuna delle regole specifiche installate successivamente.
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, #OFPP_CONTROLLER indica che i pacchetti che corrispondono a questa regola devono essere inviati al controller. ofproto.OFPCML_NO_BUFFER indica che il pacchetto non deve essere bufferizzato nello switch, ma deve essere inviato interamente al controller.
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
 
@@ -236,8 +236,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         parser = datapath.ofproto_parser
         in_port = msg.match['in_port']
 
-        pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocols(ethernet.ethernet)[0]
+        pkt = packet.Packet(msg.data) #pkt è un oggetto che rappresenta il pacchetto ricevuto dal controller. Viene creato a partire dai dati grezzi del pacchetto (msg.data) e consente di analizzare i protocolli incapsulati nel pacchetto, come Ethernet, IP, TCP, ecc.
+        eth = pkt.get_protocols(ethernet.ethernet)[0] #eth è un oggetto che rappresenta il protocollo Ethernet incapsulato nel pacchetto. Viene estratto dal pacchetto usando il metodo get_protocols() e specificando il tipo di protocollo desiderato.
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             # Ignora LLDP (traffico di controllo/topology discovery)
@@ -248,7 +248,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         now_ts = time.time()
 
         dpid = datapath.id
-        self.mac_to_port.setdefault(dpid, {})
+        self.mac_to_port.setdefault(dpid, {}) #crea un dizionario vuoto per lo switch se non esiste già, in modo da poter memorizzare le associazioni MAC-to-port per ciascun switch. se esiste
 
         flow_key = self.flow_key(dpid, in_port, src, dst, eth.ethertype)
 
@@ -262,27 +262,27 @@ class SimpleSwitch13(app_manager.RyuApp):
         # associa MAC sorgente alla porta d'ingresso
         self.mac_to_port[dpid][src] = in_port
 
-        # Se la destinazione è nota, inoltra sulla porta specifica; altrimenti usa flood
+        # Se la destinazione è nota, inoltra sulla porta specifica; altrimenti usa flood, perchè
         if dst in self.mac_to_port[dpid]:
             out_port = self.mac_to_port[dpid][dst]
         else:
             out_port = ofproto.OFPP_FLOOD
 
-        actions = [parser.OFPActionOutput(out_port)]
+        actions = [parser.OFPActionOutput(out_port)] #crea un'azione di output per inviare il pacchetto sulla porta specifica
 
         # Se non stiamo floodando, installa una flow per i prossimi pacchetti simili
         if out_port != ofproto.OFPP_FLOOD:
-            match = parser.OFPMatch(
+            match = parser.OFPMatch( #il match viene creato per corrispondere ai pacchetti futuri con le stesse caratteristiche (dpid, in_port, src, dst, eth_type). In questo modo, i pacchetti successivi che corrispondono a questo match verranno gestiti dallo switch senza dover passare nuovamente al controller.
                 in_port=in_port,
                 eth_dst=dst,
                 eth_src=src,
                 eth_type=eth.ethertype,
             )
-            if msg.buffer_id != ofproto.OFP_NO_BUFFER:
+            if msg.buffer_id != ofproto.OFP_NO_BUFFER: #se il pacchetto è stato bufferizzato, ovvero è stato memorizzato temporaneamente nello switch, allora il controller può installare la flow direttamente utilizzando l'ID del buffer. In questo modo, lo switch può inoltrare il pacchetto senza doverlo inviare nuovamente al controller.
                 self.add_flow(datapath, 1, match, actions, msg.buffer_id)
                 return
             else:
-                self.add_flow(datapath, 1, match, actions)
+                self.add_flow(datapath, 1, match, actions) #actions è la lista di azioni da eseguire per i pacchetti futuri che corrispondono al match. In questo caso, l'azione è inoltrare il pacchetto sulla porta specificata (out_port).
         
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:

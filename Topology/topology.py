@@ -5,10 +5,10 @@ from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.link import TCLink
 
 
-class Environment(object):
+class Environment(object): #la classe Environment rappresenta l'ambiente di rete che stiamo creando. Inizializza la topologia, aggiunge host e switch, e configura i collegamenti tra di essi.
 
     def __init__(self):
-        self.net = Mininet(controller=RemoteController, link=TCLink)
+        self.net = Mininet(controller=RemoteController, link=TCLink) #crea un'istanza di Mininet, specificando che useremo un controller remoto e collegamenti con caratteristiche personalizzate (TCLink).
 
         info("*** Starting controller\n")
         c1 = self.net.addController('c1', controller=RemoteController)
@@ -23,8 +23,8 @@ class Environment(object):
         info("*** Adding 10 switches\n")
         self.switches = {}
         for idx in range(1, 11):
-            name = f's{idx}'
-            self.switches[name] = self.net.addSwitch(name, cls=OVSKernelSwitch)
+            name = f's{idx}' #crea un nome per lo switch basato sull'indice (ad esempio, s1, s2, ..., s10)
+            self.switches[name] = self.net.addSwitch(name, cls=OVSKernelSwitch) #cls=OVSKernelSwitch sarebbe per usare Open vSwitch, ma si può cambiare con un altro tipo di switch se necessario
 
         info("*** Adding host access links\n")
         self.net.addLink(self.h1, self.switches['s1'], bw=10, delay='0.5ms')
@@ -61,4 +61,4 @@ if __name__ == '__main__':
     env = Environment()
 
     info("*** Running CLI\n")
-    CLI(env.net)
+    CLI(env.net) #avvia l'interfaccia a riga di comando di Mininet, consentendo di interagire con la rete creata

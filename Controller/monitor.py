@@ -16,7 +16,7 @@ class MonitoringModule:
         self.stats_queue = Queue()
 
         
-        self.flow_stats_prev = {}  # key -> {'ts': float, 'pkt_count': int}
+        self.flow_stats_prev = {}  # key -> {'ts': float, 'pkt_count': int}, ts è il timestamp dell'ultima statistica ricevuta, pkt_count è il numero di pacchetti contati fino a quel momento. Questo dizionario serve per calcolare il delta di pacchetti tra due richieste successive e quindi il rate di pacchetti al secondo (pps).
         self.flow_stats_lock = threading.Lock()
 
         # Thread 
@@ -33,7 +33,7 @@ class MonitoringModule:
         while True:
             try:
                 # ottieni lista dei datapath connessi dal controller
-                datapaths = list(getattr(self.controller, 'datapaths', {}).values())
+                datapaths = list(getattr(self.controller, 'datapaths', {}).values()) #getattr è usato per ottenere l'attributo 'datapaths' dall'oggetto controller. Se l'attributo non esiste, restituisce un dizionario vuoto. Questo evita errori se l'attributo non è stato ancora inizializzato.
 
                 for datapath in datapaths:
                     self.request_flow_stats(datapath)
@@ -46,7 +46,7 @@ class MonitoringModule:
     def request_flow_stats(self, datapath):
         #Invia OFPFlowStatsRequest allo switch
         try:
-            parser = datapath.ofproto_parser
+            parser = datapath.ofproto_parser #parser è un oggetto che fornisce metodi per creare messaggi OpenFlow. Viene ottenuto dal datapath, che rappresenta lo switch connesso al controller.
             req = parser.OFPFlowStatsRequest(datapath)
             datapath.send_msg(req)
         except Exception as e:
@@ -79,11 +79,11 @@ class MonitoringModule:
 
                 flow_key = (dpid, in_port, src, dst, eth_type)
 
-                prev = self.flow_stats_prev.get(flow_key)
-                self.flow_stats_prev[flow_key] = {'ts': now_ts, 'pkt_count': stat.packet_count}
+                prev = self.flow_stats_prev.get(flow_key) #qua recupera le statistiche precedenti del flusso dal dizionario flow_stats_prev usando flow_key come chiave. Se non ci sono statistiche precedenti, prev sarà None.
+                self.flow_stats_prev[flow_key] = {'ts': now_ts, 'pkt_count': stat.packet_count} #qua aggiorna il dizionario flow_stats_prev con le statistiche correnti del flusso, memorizzando il timestamp attuale e il conteggio dei pacchetti. Questo permette di calcolare il delta di pacchetti e il rate di pacchetti al prossimo aggiornamento.
 
                 if prev is None:
-                    continue
+                    continue #qui salta il calcolo del rate di pacchetti se non ci sono statistiche precedenti, perché non è possibile calcolare un delta senza un valore precedente.
 
                 delta_t = now_ts - prev['ts']
                 if delta_t <= 0:
